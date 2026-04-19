@@ -1,0 +1,14 @@
+# Entorno virtual
+.venv/
+env/
+venv/
+ENV/
+
+# Archivos temporales de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Otros
+.DS_Store
+.vscode/
