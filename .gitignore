@@ -12,3 +12,8 @@ __pycache__/
 # Otros
 .DS_Store
 .vscode/
+
+# Ignorar archivos de datos generados por SADE
+data/exports/*.csv
+data/exports/*.xlsx
+data/exports/*.json
