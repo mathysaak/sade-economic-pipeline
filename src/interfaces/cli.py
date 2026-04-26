@@ -2,6 +2,7 @@ import questionary
 import pandas as pd
 import os
 from extractors.ar_indec import obtener_datos_inflacion
+from extractors.ar_reservas import obtener_datos_reservas
 from analytics.procesamiento import procesar_comparacion_mandatos
 
 
@@ -13,7 +14,8 @@ def iniciar_sade_cli():
             choices=[
                 "1. Extraer última inflación mensual",
                 "2. Comparar inflación entre mandatos presidenciales",
-                "3. Salir del sistema"
+                "3. Comparar reservas del BCRA entre mandatos presidenciales",
+                "4. Salir del sistema"
             ]
         ).ask()
 
@@ -31,8 +33,55 @@ def iniciar_sade_cli():
             _ejecutar_comparacion_mandatos()
 
         elif opcion.startswith("3"):
+            _ejecutar_comparacion_reservas()
+
+        elif opcion.startswith("4"):
             print("\nCerrando SADE. ¡Hasta pronto! 👋")
             break
+
+
+def _ejecutar_comparacion_reservas():
+    print("\n--- PREPARANDO MOTOR ETL ---")
+    df_presidentes = pd.read_csv(
+        "data/presidentesAR.csv", skipinitialspace=True)
+    df_presidentes['fecha_inicio'] = pd.to_datetime(
+        df_presidentes['fecha_inicio'])
+    df_presidentes['fecha_fin'] = pd.to_datetime(df_presidentes['fecha_fin'])
+
+    from extractors.ar_reservas import obtener_datos_reservas
+    from analytics.formulas_eco import procesar_reservas_bcra
+
+    datos_api = obtener_datos_reservas()
+    if not datos_api:
+        print("❌ No se pudieron obtener datos de las reservas.")
+        return
+
+    df_democracia = df_presidentes[df_presidentes['fecha_inicio']
+                                   >= '1983-12-10']
+    df_ordenado = df_democracia.sort_values(by='fecha_inicio', ascending=False)
+    lista_nombres = df_ordenado['presidente'].unique().tolist()
+
+    print("\nInstrucciones: Usa ESPACIO para seleccionar, FLECHAS para moverte, ENTER para confirmar.")
+    presidentes_seleccionados = questionary.checkbox(
+        "Seleccione los presidentes a comparar (Mínimo 2):",
+        choices=lista_nombres
+    ).ask()
+
+    if not presidentes_seleccionados or len(presidentes_seleccionados) < 2:
+        print("❌ Operación cancelada: Debes seleccionar al menos 2 presidentes.\n")
+        return
+
+    print(
+        f"\n⚙️ Procesando análisis de reservas para: {', '.join(presidentes_seleccionados)}...")
+
+    df_resultado = procesar_reservas_bcra(
+        datos_api, df_presidentes, presidentes_seleccionados)
+
+    os.makedirs("data/exports", exist_ok=True)
+    ruta_exportacion = "data/exports/comparacion_reservas_mandatos.csv"
+    df_resultado.to_csv(ruta_exportacion, index=False)
+
+    print(f"✅ ¡Análisis completado! Archivo guardado en: {ruta_exportacion}\n")
 
 
 def _ejecutar_comparacion_mandatos():
