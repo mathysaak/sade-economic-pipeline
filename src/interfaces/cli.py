@@ -12,7 +12,7 @@ def iniciar_sade_cli():
             "📊 BIENVENIDO A SADE v1.1 - ¿Qué deseas auditar?",
             choices=[
                 "1. Extraer última inflación mensual",
-                "2. Comparar inflación entre dos presidentes",
+                "2. Comparar inflación entre mandatos presidenciales",
                 "3. Salir del sistema"
             ]
         ).ask()
@@ -40,40 +40,43 @@ def _ejecutar_comparacion_mandatos():
     df_presidentes = pd.read_csv(
         "data/presidentesAR.csv", skipinitialspace=True)
     df_presidentes['fecha_fin'] = pd.to_datetime(df_presidentes['fecha_fin'])
+    df_presidentes['fecha_inicio'] = pd.to_datetime(
+        df_presidentes['fecha_inicio'])  # Aseguramos formato
 
     datos_api = obtener_datos_inflacion()
     if not datos_api:
         return
 
-    primera_fecha_inflacion = pd.to_datetime(datos_api[0]['fecha'])
-    df_filtrado = df_presidentes[df_presidentes['fecha_fin']
-                                 >= primera_fecha_inflacion]
-    df_ordenado = df_filtrado.sort_values(by='fecha_inicio', ascending=False)
+    # FILTRO DEMOCRACIA: Nos quedamos solo con los que asumieron desde el 10/12/1983
+    df_democracia = df_presidentes[df_presidentes['fecha_inicio']
+                                   >= '1983-12-10']
+    df_ordenado = df_democracia.sort_values(by='fecha_inicio', ascending=False)
 
     # Lista de nombres para el menú
     lista_nombres = df_ordenado['presidente'].unique().tolist()
 
-    # 2. SELECCIÓN INTERACTIVA DEL PRESIDENTE BASE (Con flechas)
-    nombre_presi_1 = questionary.select(
-        "Seleccione el PRIMER presidente (Mandato Base):",
+    # EL NUEVO MENÚ CHECKBOX
+    print("\nInstrucciones: Usa ESPACIO para seleccionar, FLECHAS para moverte, ENTER para confirmar.")
+    presidentes_seleccionados = questionary.checkbox(
+        "Seleccione los presidentes a comparar (Mínimo 2):",
         choices=lista_nombres
     ).ask()
 
-    # 3. SELECCIÓN INTERACTIVA DEL PRESIDENTE A COMPARAR
-    nombre_presi_2 = questionary.select(
-        "Seleccione el SEGUNDO presidente (A comparar):",
-        choices=lista_nombres
-    ).ask()
+    # Validación de usuario
+    if not presidentes_seleccionados or len(presidentes_seleccionados) < 2:
+        print("❌ Operación cancelada: Debes seleccionar al menos 2 presidentes para comparar.\n")
+        return
 
-    print(f"\n⚙️ Procesando: {nombre_presi_1} vs {nombre_presi_2}...")
+    print(
+        f"\n⚙️ Procesando análisis múltiple para: {', '.join(presidentes_seleccionados)}...")
 
-    # Procesamos
+    # Procesamos pasándole la lista entera
     df_resultado = procesar_comparacion_mandatos(
-        datos_api, df_presidentes, nombre_presi_1, nombre_presi_2)
+        datos_api, df_presidentes, presidentes_seleccionados)
 
-    # Verificamos si la carpeta existe, si no, la creamos
+    import os
     os.makedirs("data/exports", exist_ok=True)
-
-    ruta_exportacion = "data/exports/comparacion_mandatos.csv"
+    ruta_exportacion = "data/exports/comparacion_multi_mandatos.csv"
     df_resultado.to_csv(ruta_exportacion, index=False)
+
     print(f"✅ ¡Análisis completado! Archivo guardado en: {ruta_exportacion}\n")
