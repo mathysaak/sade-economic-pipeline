@@ -17,3 +17,5 @@ __pycache__/
 data/exports/*.csv
 data/exports/*.xlsx
 data/exports/*.json
+
+src/interfaces/preparar_flourish.py
